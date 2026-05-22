@@ -29,6 +29,7 @@ local Settings = {
     AimKeybindName = "None",
     AimPrediction = 0.1,
     AimHoldMode = true,
+    SilentAimBypass = true,
     BoxESP = false,
     TracerESP = false,
     ESPColor = Color3.fromRGB(255, 50, 50)
@@ -579,12 +580,12 @@ AddClickEffect(AimDropdownBtn)
 local AimDropdownFrame = Instance.new("Frame")
 AimDropdownFrame.Name = "AimDropdownFrame"
 AimDropdownFrame.Size = UDim2.new(0, 170, 0, #Features.Aim.Methods * 28)
-AimDropdownFrame.Position = UDim2.new(0, 100, 0, 138)
+AimDropdownFrame.Position = UDim2.new(0, 0, 0, 0)
 AimDropdownFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 AimDropdownFrame.BorderSizePixel = 0
 AimDropdownFrame.Visible = false
 AimDropdownFrame.ZIndex = 20
-AimDropdownFrame.Parent = AimPage
+AimDropdownFrame.Parent = ScreenGui
 local AimDropdownFrameStroke = Instance.new("UIStroke")
 AimDropdownFrameStroke.Color = Color3.fromRGB(80, 80, 90)
 AimDropdownFrameStroke.Thickness = 1
@@ -627,6 +628,11 @@ end
 
 AimDropdownBtn.MouseButton1Click:Connect(function()
     dropdownOpen = not dropdownOpen
+    if dropdownOpen then
+        local absPos = AimDropdownBtn.AbsolutePosition
+        local absSize = AimDropdownBtn.AbsoluteSize
+        AimDropdownFrame.Position = UDim2.new(0, absPos.X, 0, absPos.Y + absSize.Y + 2)
+    end
     AimDropdownFrame.Visible = dropdownOpen
 end)
 
@@ -796,6 +802,47 @@ AddClickEffect(AimModeBtn)
 AimModeBtn.MouseButton1Click:Connect(function()
     Settings.AimHoldMode = not Settings.AimHoldMode
     AimModeBtn.Text = Settings.AimHoldMode and "Hold" or "Toggle"
+end)
+
+--// Silent Aim Bypass Toggle Row
+local SABypassRow = CreateAimRow(IsPC and 210 or 168)
+local SABypassLabel = Instance.new("TextLabel")
+SABypassLabel.Size = UDim2.new(0, 100, 1, 0)
+SABypassLabel.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+SABypassLabel.Text = "SA Bypass"
+SABypassLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+SABypassLabel.TextSize = 12
+SABypassLabel.Font = Enum.Font.GothamBold
+SABypassLabel.Parent = SABypassRow
+local SABypassLabelCorner = Instance.new("UICorner")
+SABypassLabelCorner.CornerRadius = UDim.new(0, 6)
+SABypassLabelCorner.Parent = SABypassLabel
+
+local SABypassBtn = Instance.new("TextButton")
+SABypassBtn.Size = UDim2.new(0, 120, 1, 0)
+SABypassBtn.Position = UDim2.new(0, 110, 0, 0)
+SABypassBtn.BackgroundColor3 = Settings.SilentAimBypass and Color3.fromRGB(30, 80, 30) or Color3.fromRGB(80, 30, 30)
+SABypassBtn.Text = Settings.SilentAimBypass and "ON" or "OFF"
+SABypassBtn.TextColor3 = Settings.SilentAimBypass and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100)
+SABypassBtn.TextSize = 12
+SABypassBtn.Font = Enum.Font.GothamBold
+SABypassBtn.Parent = SABypassRow
+local SABypassBtnCorner = Instance.new("UICorner")
+SABypassBtnCorner.CornerRadius = UDim.new(0, 6)
+SABypassBtnCorner.Parent = SABypassBtn
+AddClickEffect(SABypassBtn)
+
+SABypassBtn.MouseButton1Click:Connect(function()
+    Settings.SilentAimBypass = not Settings.SilentAimBypass
+    if Settings.SilentAimBypass then
+        SABypassBtn.BackgroundColor3 = Color3.fromRGB(30, 80, 30)
+        SABypassBtn.Text = "ON"
+        SABypassBtn.TextColor3 = Color3.fromRGB(100, 255, 100)
+    else
+        SABypassBtn.BackgroundColor3 = Color3.fromRGB(80, 30, 30)
+        SABypassBtn.Text = "OFF"
+        SABypassBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+    end
 end)
 
 --// Create Misc Page
@@ -1696,12 +1743,13 @@ if IsPC then
     end)
 end
 
---// Silent Aim: snap camera for 1 frame on fire
+--// Silent Aim: snap camera for 1 frame on fire (only when bypass enabled)
 if IsPC then
     UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
         if not Features.Aim.Enabled then return end
         if Features.Aim.Method ~= 2 then return end -- Only Silent Aim
+        if not Settings.SilentAimBypass then return end
         if input.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
         
         local camera = workspace.CurrentCamera
@@ -1745,6 +1793,11 @@ RunService.RenderStepped:Connect(function()
             
             if method == 1 then -- Aimbot
                 camera.CFrame = CFrame.new(camera.CFrame.Position, targetPos)
+            elseif method == 2 then -- Silent Aim (smooth mode when bypass off)
+                if not Settings.SilentAimBypass then
+                    local targetCF = CFrame.new(camera.CFrame.Position, targetPos)
+                    camera.CFrame = camera.CFrame:Lerp(targetCF, 0.03)
+                end
             elseif method == 3 then -- Smooth Aim
                 local targetCF = CFrame.new(camera.CFrame.Position, targetPos)
                 camera.CFrame = camera.CFrame:Lerp(targetCF, 0.12)
@@ -1753,7 +1806,6 @@ RunService.RenderStepped:Connect(function()
                     camera.CFrame = CFrame.new(camera.CFrame.Position, targetPos)
                 end
             end
-            -- method == 2 (Silent Aim) is handled in the InputBegan hook above
         end
     end
 end)
